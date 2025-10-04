@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.python-version
+.DS_Store
+
+.vscode/
+
+airbnb.db
+
+data/raw/*
+notebooks/
