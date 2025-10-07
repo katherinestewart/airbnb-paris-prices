@@ -37,3 +37,33 @@ count_rows:
 	SELECT 'listings' AS table, COUNT(*) AS n FROM raw.listings \
 	UNION ALL \
 	SELECT 'reviews', COUNT(*) FROM raw.reviews;"
+
+clean:
+	python scripts/clean_listings.py
+	python scripts/clean_reviews.py
+
+verify_clean:
+	@{ \
+	  echo "table|cols|rows|min_price|max_price"; \
+	  docker compose exec -T db psql -U airbnb -d airbnb -X -qAt -F '|' -c "\
+	WITH cols AS ( \
+		SELECT table_name, COUNT(*) AS cols \
+		FROM information_schema.columns \
+		WHERE table_schema='clean' \
+		GROUP BY table_name \
+	) \
+	SELECT 'listings_features', \
+				(SELECT cols FROM cols WHERE table_name='listings_features'), \
+				COUNT(*), MIN(price), MAX(price) \
+	FROM clean.listings_features \
+	UNION ALL \
+	SELECT 'reviews', \
+				(SELECT cols FROM cols WHERE table_name='reviews'), \
+				COUNT(*), NULL::double precision, NULL::double precision \
+	FROM clean.reviews \
+	UNION ALL \
+	SELECT 'reviews_summary', \
+				(SELECT cols FROM cols WHERE table_name='reviews_summary'), \
+				COUNT(*), NULL::double precision, NULL::double precision \
+	FROM clean.reviews_summary;"; \
+		} | column -t -s '|'
