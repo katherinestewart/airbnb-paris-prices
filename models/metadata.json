@@ -1,0 +1,23 @@
+{
+    "model_name": "XGBoost Regressor",
+    "model_version": "v1",
+    "trained_on": "2025-10-10",
+    "features": [
+        "accommodates",
+        "bedrooms",
+        "beds",
+        "bathrooms",
+        "avg_comment_length",
+        "days_since_last_review",
+        "neighbourhood_cleansed",
+        "property_type",
+        "room_type"
+    ],
+    "metrics": {
+        "MAE": 92.04,
+        "RMSE": 159.08
+    },
+    "preprocessor_file": "preprocessing_v1.pkl",
+    "model_file": "xgb_model_v1.pkl",
+    "notes": "Trained on Airbnb Paris cleaned dataset using numeric and categorical features."
+}

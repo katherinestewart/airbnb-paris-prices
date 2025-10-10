@@ -1,3 +1,11 @@
 sqlalchemy
 psycopg2-binary
 pandas
+numpy
+scikit-learn
+xgboost
+joblib
+matplotlib
+seaborn
+streamlit
+pyarrow

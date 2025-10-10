@@ -1,0 +1,11 @@
+feature,importance
+bathrooms,0.19199903
+property_type_Room in boutique hotel,0.08449083
+bedrooms,0.04068795
+accommodates,0.038959034
+neighbourhood_cleansed_Palais-Bourbon,0.037336994
+neighbourhood_cleansed_Louvre,0.036057856
+neighbourhood_cleansed_Ménilmontant,0.03536713
+neighbourhood_cleansed_Buttes-Chaumont,0.033286
+neighbourhood_cleansed_Luxembourg,0.031005114
+property_type_Room in hotel,0.029402668

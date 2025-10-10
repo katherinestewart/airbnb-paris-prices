@@ -67,3 +67,14 @@ verify_clean:
 				COUNT(*), NULL::double precision, NULL::double precision \
 	FROM clean.reviews_summary;"; \
 		} | column -t -s '|'
+
+.PHONY: cache train app
+
+cache:
+	python -c "from src.data.load_data import load_data; load_data(use_cache=True)"
+
+train:
+	python src/models/train.py
+
+app:
+	streamlit run app/streamlit_app.py
