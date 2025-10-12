@@ -76,7 +76,7 @@ Command	Description:
 -----------------------------------------------------------------------------
 
 -Directory Structure-
-
+```text
 airbnb-paris-prices/
 │
 ├─ app/
