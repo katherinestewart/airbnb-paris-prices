@@ -1,7 +1,7 @@
 {
-    "model_name": "XGBoost Regressor",
+    "model_name": "XGBoost Regressor (log-target + neighbourhood TE)",
     "model_version": "v1",
-    "trained_on": "2025-10-10",
+    "trained_on": "2025-10-12",
     "features": [
         "accommodates",
         "bedrooms",
@@ -9,15 +9,17 @@
         "bathrooms",
         "avg_comment_length",
         "days_since_last_review",
-        "neighbourhood_cleansed",
+        "amenities_count",
+        "dist_to_center_km",
+        "neighbourhood_te",
         "property_type",
         "room_type"
     ],
     "metrics": {
-        "MAE": 92.04,
-        "RMSE": 159.08
+        "MAE": 80.91,
+        "RMSE": 150.92
     },
     "preprocessor_file": "preprocessing_v1.pkl",
     "model_file": "xgb_model_v1.pkl",
-    "notes": "Trained on Airbnb Paris cleaned dataset using numeric and categorical features."
+    "notes": "Trained on log1p(price) with neighbourhood target encoding (full-data mapping) and early stopping."
 }

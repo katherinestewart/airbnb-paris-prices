@@ -1,3 +1,21 @@
+"""
+Central configuration for the project.
+
+This module centralizes environment-independent constants and derived paths
+used throughout the codebase (database connection string, data and model paths).
+
+Constants
+---------
+ENGINE_URL : str
+    SQLAlchemy connection URL for the project's Postgres database.
+BASE_DIR : str
+    Absolute path to the project `src` parent directory.
+DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR : str
+    Paths to data folders.
+MODELS_DIR, MODEL_FILE, PREPROCESSOR_FILE, METADATA_FILE : str
+    Paths to model artifacts and metadata.
+"""
+
 import os
 
 DB_USER = "airbnb"
