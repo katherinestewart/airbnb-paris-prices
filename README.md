@@ -136,7 +136,7 @@ airbnb-paris-prices/
 ├─ Makefile
 ├─ README.md
 └─ requirements.txt
-
+```
 
 -----------------------------------------------------------------------------
 
@@ -156,7 +156,8 @@ airbnb-paris-prices/
     make train
 
       (This will train XGBoost on log-transformed nightly price.
-       Saves pipeline to models/xgb_model_v1.pkl and metadata to          models/metadata.json.)
+       Saves pipeline to models/xgb_model_v1.pkl and metadata to
+       models/metadata.json.)
 
 .4  Evaluate Model Performance
 
@@ -171,7 +172,8 @@ airbnb-paris-prices/
     make app
 
       (Interactive interface for predicting nightly price.
-      Input fields for neighbourhood, property_type, room_type, accommodates, bedrooms, beds, bathrooms, avg_comment_length, days_since_last_review. Predicted price displayed instantly.)
+      Input fields for neighbourhood, property_type, room_type,
+      accommodates, bedrooms, beds, bathrooms, avg_comment_length, days_since_last_review. Predicted price displayed instantly.)
 
 -----------------------------------------------------------------------------
 
