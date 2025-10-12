@@ -76,5 +76,8 @@ cache:
 train:
 	python src/models/train.py
 
+evaluate:
+	python src/models/evaluate.py
+
 app:
 	streamlit run app/streamlit_app.py
