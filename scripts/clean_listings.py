@@ -1,8 +1,11 @@
 import ast
+import json
 import pandas as pd
 from pathlib import Path
 from collections import Counter
 from sqlalchemy import create_engine, text, BigInteger
+
+MAP_PATH = Path("docs/property_type_map.json")
 
 
 def load_raw_listings():
@@ -87,11 +90,26 @@ def apply_outlier_filters(df):
     return df.loc[mask].copy()
 
 
-def add_property_type_slim(df, min_frac=0.01):
-    vc = df["property_type"].value_counts(dropna=False)
-    keep = set(vc[vc / len(df) >= min_frac].index)   # ≥1%
-    df["property_type_slim"] = df["property_type"].where(df["property_type"].isin(keep), "Other")
-    return df
+def add_property_type_slim(df):
+    """
+    Add df['property_type_slim'] using a persisted JSON mapping.
+    Expects docs/property_type_map.json to exist.
+    Any categories not present in the mapping are set to 'Other'.
+    """
+    if not MAP_PATH.exists():
+        raise FileNotFoundError(
+            f"Property-type mapping not found at {MAP_PATH}. "
+            "Please commit docs/property_type_map.json."
+        )
+
+    with open(MAP_PATH, "r") as f:
+        payload = json.load(f)
+
+    prop_map = payload.get("mapping", payload)
+
+    out = df.copy()
+    out["property_type_slim"] = out["property_type"].map(prop_map).fillna("Other")
+    return out
 
 
 def save_to_postgres(df):
@@ -117,7 +135,7 @@ def main():
     df = handle_missing(df)
     df = engineer_features(df)
     df = apply_outlier_filters(df)
-    df = add_property_type_slim(df, min_frac=0.01)
+    df = add_property_type_slim(df)
     save_to_postgres(df)
 
 
