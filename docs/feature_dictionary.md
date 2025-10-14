@@ -11,7 +11,7 @@ make verify_clean
 
 | table             | cols |  rows  | min_price | max_price |
 |:------------------|-----:|-------:|----------:|----------:|
-| listings_features |   33 |  53326 |        15 |      2000 |
+| listings_features |   34 |  53326 |        15 |      2000 |
 | reviews           |    6 | 2173219 |           |           |
 | reviews_summary   |    6 |   64498 |           |           |
 
@@ -79,7 +79,8 @@ amenity_dishes_and_silverware _BOOLEAN_\
 amenity_bed_linens _BOOLEAN_\
 amenity_cooking_basics _BOOLEAN_\
 amenity_essentials _BOOLEAN_\
-amenity_iron _BOOLEAN_
+amenity_iron _BOOLEAN_\
+property_type_slim _TEXT_
 
 ## Clean Reviews Steps
 
