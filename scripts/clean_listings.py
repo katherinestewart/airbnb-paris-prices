@@ -1,5 +1,6 @@
 import ast
 import pandas as pd
+from pathlib import Path
 from collections import Counter
 from sqlalchemy import create_engine, text, BigInteger
 
@@ -62,7 +63,6 @@ def engineer_features(df):
     df["amenities_list"] = df["amenities"].apply(
         lambda x: ast.literal_eval(x) if isinstance(x, str) else []
     )
-    from collections import Counter
     top_amenities = [
         a for a, _ in Counter(
             [am for sublist in df["amenities_list"] for am in sublist]
@@ -85,6 +85,13 @@ def apply_outlier_filters(df):
     ppg = df["price"] / df["accommodates"].clip(lower=1)
     mask = df["price"].between(PRICE_MIN, PRICE_MAX) & (ppg <= PPG_MAX)
     return df.loc[mask].copy()
+
+
+def add_property_type_slim(df, min_frac=0.01):
+    vc = df["property_type"].value_counts(dropna=False)
+    keep = set(vc[vc / len(df) >= min_frac].index)   # ≥1%
+    df["property_type_slim"] = df["property_type"].where(df["property_type"].isin(keep), "Other")
+    return df
 
 
 def save_to_postgres(df):
@@ -110,6 +117,7 @@ def main():
     df = handle_missing(df)
     df = engineer_features(df)
     df = apply_outlier_filters(df)
+    df = add_property_type_slim(df, min_frac=0.01)
     save_to_postgres(df)
 
 
