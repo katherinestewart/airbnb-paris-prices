@@ -9,8 +9,26 @@ from src.models.predict import predict_price
 from src.data.load_data import load_data
 from src.config import METADATA_FILE
 
+MAP_PATH = Path(__file__).resolve().parents[1] / "docs" / "property_type_map.json"
+
 st.set_page_config(page_title="Airbnb Paris Price Predictor", layout="wide")
 st.title("Airbnb Paris Price Predictor")
+
+
+def load_property_type_slim_options():
+    if not MAP_PATH.exists():
+        return None  # fallback to old behavior
+    payload = json.loads(MAP_PATH.read_text(encoding="utf-8"))
+    kept = payload.get("kept_categories")
+    if not kept:
+        # derive kept from mapping (anything not mapped to "Other")
+        mapping = payload.get("mapping", {})
+        kept = sorted({v for v in mapping.values() if v != "Other"})
+    opts = sorted(kept)
+    if "Other" not in opts:
+        opts.append("Other")
+    return opts
+
 
 @st.cache_resource
 def load_metadata() -> Dict:
@@ -56,7 +74,19 @@ def select_or_text(df_col: str, label: str, default: str):
     return st.sidebar.text_input(label, value=default)
 
 neighbourhood = select_or_text("neighbourhood_cleansed", "Neighbourhood", "Louvre")
-property_type = select_or_text("property_type", "Property Type", "Apartment")
+
+pt_slim_options = load_property_type_slim_options()
+if pt_slim_options:
+    property_type_slim = st.sidebar.selectbox(
+        "Property Type (grouped)",
+        pt_slim_options,
+        index=pt_slim_options.index("Entire rental unit") if "Entire rental unit" in pt_slim_options else 0,
+        help="Grouped categories from training; rare types map to 'Other'."
+    )
+else:
+    # fallback (keeps Lele's original behavior if JSON missing)
+    property_type_slim = select_or_text("property_type", "Property Type", "Apartment")
+
 room_type = select_or_text("room_type", "Room Type", "Entire home/apt")
 
 # Number inputs
@@ -83,7 +113,7 @@ days_since_last_review = number_input_with_bounds("Days Since Last Review", "day
 
 input_dict = {
     "neighbourhood_cleansed": neighbourhood,
-    "property_type": property_type,
+    "property_type_slim": property_type_slim,
     "room_type": room_type,
     "accommodates": int(accommodates),
     "bedrooms": int(bedrooms),
@@ -92,6 +122,7 @@ input_dict = {
     "avg_comment_length": float(avg_comment_length),
     "days_since_last_review": int(days_since_last_review),
 }
+
 
 col1, col2 = st.columns([2, 1])
 
