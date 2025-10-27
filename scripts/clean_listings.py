@@ -90,6 +90,11 @@ def apply_outlier_filters(df):
     return df.loc[mask].copy()
 
 
+def filter_short_stays(df, max_min_nights=27):
+    """Keep listings with minimum_nights <= max_min_nights (default: <28)."""
+    return df[df["minimum_nights"] <= max_min_nights].copy()
+
+
 def add_property_type_slim(df):
     """
     Add df['property_type_slim'] using a persisted JSON mapping.
@@ -135,6 +140,7 @@ def main():
     df = handle_missing(df)
     df = engineer_features(df)
     df = apply_outlier_filters(df)
+    df = filter_short_stays(df, max_min_nights=27)
     df = add_property_type_slim(df)
     save_to_postgres(df)
 
