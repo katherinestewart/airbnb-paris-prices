@@ -1,229 +1,97 @@
-"""
-Final training script for the Airbnb Paris price model.
-
-Features and behaviour
-----------------------
-- Loads processed data via src.data.load_data.load_data (which applies feature engineering).
-- Computes a full-data neighbourhood -> mean(price) mapping (neighbourhood target encoding),
-  stores it in models/neighbourhood_te.json and adds 'neighbourhood_te' to the training data.
-- Uses log1p(price) as the training target and inverts predictions when evaluating.
-- Builds a ColumnTransformer (numeric median imputer + categorical one-hot).
-- Fits preprocessor, transforms arrays, and trains XGBRegressor with early stopping.
-- Saves:
-    - full pipeline to MODEL_FILE (preprocessor + regressor)
-    - preprocessor to PREPROCESSOR_FILE
-    - neighbourhood mapping to models/neighbourhood_te.json
-    - metadata (features, metrics) to METADATA_FILE
-
-Usage
------
-python src/models/train.py
-"""
-from __future__ import annotations
-
-import json
-import os
 from pathlib import Path
-from typing import List, Dict
-
 import joblib
+import json
 import numpy as np
 import pandas as pd
-from sklearn.compose import ColumnTransformer
+from sqlalchemy import create_engine
+from sklearn.model_selection import train_test_split, KFold, RandomizedSearchCV
+from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.model_selection import train_test_split
-from xgboost import XGBRegressor
+from sklearn.metrics import mean_absolute_error
+import xgboost as xgb
 
-from src.config import MODEL_FILE, PREPROCESSOR_FILE, METADATA_FILE
-from src.data.load_data import load_data
+ARTIFACT_DIR = Path("models"); ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+DB_URL = "postgresql://airbnb:airbnb@localhost:5432/airbnb"
 
+SQL = """
+SELECT l.*, r.n_reviews, r.first_review, r.last_review,
+       r.avg_comment_length, r.days_since_last_review
+FROM clean.listings_features l
+LEFT JOIN clean.reviews_summary r ON r.listing_id = l.id;
+"""
 
-_NEIGH_TE_FILE = Path(MODEL_FILE).parent / "neighbourhood_te.json"
+def load_df():
+    eng = create_engine(DB_URL)
+    return pd.read_sql(SQL, eng)
 
+def build_preproc(df):
+    cat = ["neighbourhood_cleansed", "property_type_slim", "room_type"]
+    num = [c for c in df.columns
+           if c not in cat + ["price","id","first_review","last_review","property_type"]]
+    return ColumnTransformer([
+        ("cat", OneHotEncoder(
+            handle_unknown="infrequent_if_exist",
+            min_frequency=0.01
+        ), cat),
+        ("num", SimpleImputer(strategy="median"), num),
+    ])
 
-def make_onehot_encoder(**kwargs):
-    """
-    Backwards/forwards compatible OneHotEncoder constructor.
-    Accepts `sparse` in older sklearn and maps it to `sparse_output` if needed.
-    """
-    try:
-        return OneHotEncoder(**kwargs)
-    except TypeError:
-        kwargs2 = dict(kwargs)
-        if "sparse" in kwargs2:
-            sparse_val = kwargs2.pop("sparse")
-            kwargs2["sparse_output"] = sparse_val
-            return OneHotEncoder(**kwargs2)
-        raise
+def main(seed=42):
+    df = load_df()
 
+    y = df["price"]
+    X = df.drop(columns=["price","id","first_review","last_review","property_type"])
 
-def _ensure_dir_for(path: str):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    # stratify by binned log-price so the tail is represented
+    strat = pd.qcut(np.log(y), q=10, labels=False, duplicates="drop")
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=seed, stratify=strat)
 
+    pre = build_preproc(df)
+    xgb_reg = xgb.XGBRegressor(tree_method="hist", n_estimators=1000, learning_rate=0.05, random_state=seed)
+    pipe = Pipeline([("pre", pre), ("model", xgb_reg)])
+    model = TransformedTargetRegressor(regressor=pipe, func=np.log, inverse_func=np.exp)
 
-def _save_neighbourhood_mapping(mapping: Dict[str, float], global_mean: float):
-    payload = {"mapping": mapping, "global_mean": float(global_mean)}
-    try:
-        _NEIGH_TE_FILE.write_text(json.dumps(payload), encoding="utf-8")
-    except Exception:
-
-        pass
-
-
-def _compute_and_persist_neighbourhood_mapping(df: pd.DataFrame) -> Dict[str, float]:
-    """
-    Compute full-dataset neighbourhood -> mean(price) mapping and persist it.
-    Returns the mapping and writes the mapping JSON to models/.
-    """
-    if "neighbourhood_cleansed" in df.columns and "price" in df.columns:
-        grp = df.groupby("neighbourhood_cleansed")["price"].mean()
-        mapping = {str(k): float(v) for k, v in grp.to_dict().items()}
-        global_mean = float(df["price"].mean())
-    else:
-        mapping = {}
-        global_mean = 0.0
-
-    _save_neighbourhood_mapping(mapping, global_mean)
-    return {"mapping": mapping, "global_mean": global_mean}
-
-
-def train_model(random_state: int = 42):
-    """
-    Train final pipeline and persist artifacts.
-
-    Parameters
-    ----------
-    random_state : int
-        RNG seed for reproducibility.
-    """
-
-    df = load_data(use_cache=True)
-
-
-    df = df.dropna(subset=["price"]).copy()
-    df["price"] = pd.to_numeric(df["price"], errors="coerce")
-    df = df.dropna(subset=["price"])
-    df["price"] = df["price"].astype(float)
-
-
-    numeric_cols: List[str] = [
-        "accommodates",
-        "bedrooms",
-        "beds",
-        "bathrooms",
-        "avg_comment_length",
-        "days_since_last_review",
-        "amenities_count",
-        "dist_to_center_km",
-    ]
-    categorical_cols: List[str] = [
-        "property_type",
-        "room_type",
-    ]
-
-    neigh_info = _compute_and_persist_neighbourhood_mapping(df)
-    mapping = neigh_info["mapping"]
-    global_mean = neigh_info["global_mean"]
-
-
-    if "neighbourhood_cleansed" in df.columns:
-        df["neighbourhood_te"] = df["neighbourhood_cleansed"].apply(
-            lambda x: float(mapping.get(x, global_mean)) if pd.notna(x) else float(global_mean)
-        )
-    else:
-        df["neighbourhood_te"] = float(global_mean)
-
-
-    numeric_final = [c for c in numeric_cols if c in df.columns] + ["neighbourhood_te"]
-    categorical_final = [c for c in categorical_cols if c in df.columns]
-
-    features = numeric_final + categorical_final
-    if not features:
-        raise RuntimeError("No features found for training. Check data and feature engineering step.")
-
-    X = df[features].copy()
-    y = df["price"].copy()
-
-
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.10, random_state=random_state)
-
-
-    numeric_transformer = SimpleImputer(strategy="median")
-    categorical_transformer = Pipeline(
-        steps=[
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            ("onehot", make_onehot_encoder(handle_unknown="ignore", sparse=False)),
-        ]
+    param_dist = {
+        "regressor__model__max_depth": [4, 6, 8, 10],
+        "regressor__model__min_child_weight": [1, 3, 5, 7],
+        "regressor__model__subsample": [0.6, 0.8, 1.0],
+        "regressor__model__colsample_bytree": [0.6, 0.8, 1.0],
+        "regressor__model__gamma": [0, 0.5, 1.0],
+        "regressor__model__reg_alpha": [0, 0.001, 0.01, 0.1],
+        "regressor__model__reg_lambda": [0.1, 1.0, 5.0, 10.0],
+        "regressor__model__learning_rate": [0.03, 0.05, 0.08],
+        "regressor__model__n_estimators": [400, 800, 1200],
+        "regressor__model__objective": ["reg:squarederror", "reg:absoluteerror"],
+    }
+    cv = KFold(n_splits=5, shuffle=True, random_state=seed)
+    search = RandomizedSearchCV(
+        estimator=model, param_distributions=param_dist, n_iter=30,
+        scoring="neg_mean_absolute_error", cv=cv, n_jobs=-1, random_state=seed, verbose=1
     )
+    search.fit(X_train, y_train)
+    best = search.best_estimator_
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("num", numeric_transformer, numeric_final),
-            ("cat", categorical_transformer, categorical_final),
-        ],
-        remainder="drop",
-    )
-
-    preprocessor.fit(X_train)
-    X_train_t = preprocessor.transform(X_train)
-    X_val_t = preprocessor.transform(X_val)
-
-
-    y_train_log = np.log1p(y_train)
-    y_val_log = np.log1p(y_val)
-
-
-    xgb = XGBRegressor(
-        n_estimators=2000,
-        learning_rate=0.03,
-        max_depth=6,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=random_state,
-        n_jobs=-1,
-        verbosity=1,
-    )
-
-
-    xgb.fit(X_train_t, y_train_log)
-
-    final_pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("regressor", xgb)])
-
-
-    _ensure_dir_for(MODEL_FILE)
-    joblib.dump(final_pipeline, MODEL_FILE)
-    joblib.dump(preprocessor, PREPROCESSOR_FILE)
-
-
-    y_pred_log = xgb.predict(X_val_t)
-    y_pred = np.expm1(y_pred_log)
-
-    from sklearn.metrics import mean_absolute_error, mean_squared_error
-
-    mae = mean_absolute_error(y_val, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_val, y_pred))
-
-
-    metadata = {
-        "model_name": "XGBoost Regressor (log-target + neighbourhood TE)",
-        "model_version": "v1",
-        "trained_on": pd.Timestamp.today().strftime("%Y-%m-%d"),
-        "features": features,
-        "metrics": {"MAE": round(float(mae), 2), "RMSE": round(float(rmse), 2)},
-        "preprocessor_file": os.path.basename(PREPROCESSOR_FILE),
-        "model_file": os.path.basename(MODEL_FILE),
-        "notes": "Trained on log1p(price) with neighbourhood target encoding (full-data mapping) and early stopping.",
+    y_pred = best.predict(X_test)
+    mae_overall = mean_absolute_error(y_test, y_pred)
+    p90 = y_test.quantile(0.90)
+    hi = y_test >= p90
+    metrics = {
+        "cv_mae_mean": float(-search.best_score_),
+        "mae_overall": float(mae_overall),
+        "mae_p90plus": float(mean_absolute_error(y_test[hi], y_pred[hi])),
+        "mae_le_p90": float(mean_absolute_error(y_test[~hi], y_pred[~hi])),
+        "best_params": search.best_params_,
+        "features": list(X.columns),
     }
 
-    _ensure_dir_for(METADATA_FILE)
-    with open(METADATA_FILE, "w") as fh:
-        json.dump(metadata, fh, indent=4)
+    joblib.dump(best, ARTIFACT_DIR / "price_xgb_ttr_v2.joblib")
+    (ARTIFACT_DIR / "price_xgb_ttr_v2.metadata.json").write_text(json.dumps(metrics, indent=2))
 
-    print(f"Training completed. Validation MAE={mae:.2f}, RMSE={rmse:.2f}")
-    print(f"Saved: {MODEL_FILE}, {PREPROCESSOR_FILE}, {METADATA_FILE}, {_NEIGH_TE_FILE}")
 
+    print("Saved models/retrained_model.joblib")
+    print(json.dumps(metrics, indent=2))
 
 if __name__ == "__main__":
-    train_model()
+    main()
