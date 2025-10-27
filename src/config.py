@@ -32,6 +32,6 @@ RAW_DATA_DIR = os.path.join(DATA_DIR, "raw")
 PROCESSED_DATA_DIR = os.path.join(DATA_DIR, "processed")
 
 MODELS_DIR = os.path.join(BASE_DIR, "models")
-MODEL_FILE = os.path.join(MODELS_DIR, "xgb_model_v1.pkl")
+MODEL_FILE = os.path.join(MODELS_DIR, "short_term_only.joblib")
 PREPROCESSOR_FILE = os.path.join(MODELS_DIR, "preprocessing_v1.pkl")
-METADATA_FILE = os.path.join(MODELS_DIR, "metadata.json")
+METADATA_FILE = os.path.join(MODELS_DIR, "short_term_only.metadata.json")
