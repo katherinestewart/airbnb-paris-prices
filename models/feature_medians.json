@@ -1,0 +1,22 @@
+{
+  "latitude": 48.8655139,
+  "longitude": 2.346560770319125,
+  "accommodates": 3.0,
+  "bedrooms": 1.0,
+  "beds": 2.0,
+  "bathrooms": 1.0,
+  "minimum_nights": 2.0,
+  "maximum_nights": 365.0,
+  "review_scores_rating": 4.84,
+  "review_scores_accuracy": 4.87,
+  "review_scores_cleanliness": 4.8,
+  "review_scores_checkin": 4.91,
+  "review_scores_communication": 4.94,
+  "review_scores_location": 4.91,
+  "review_scores_value": 4.71,
+  "reviews_per_month": 0.99,
+  "amenities_count": 30.0,
+  "n_reviews": 19.0,
+  "avg_comment_length": 247.6,
+  "days_since_last_review": 24.0
+}

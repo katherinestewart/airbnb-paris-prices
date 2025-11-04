@@ -1,0 +1,19 @@
+# Streamlit server configuration
+[server]
+# Run headless in container / Cloud Run style deployments
+headless = true
+# Default port for local development (Streamlit default is 8501)
+port = 8501
+# If you run behind a reverse proxy, set enableCORS accordingly
+enableCORS = false
+# If you want the server to be accessible externally inside a container, set this to false
+# (but for Cloud Run / container deployments you typically want false)
+enableXsrfProtection = true
+
+# Simple visual theme tweaks
+[theme]
+primaryColor = "#0B6E4F"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F7F9FA"
+textColor = "#0F172A"
+font = "sans serif"

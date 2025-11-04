@@ -16,15 +16,12 @@ This repository provides an end-to-end solution for predicting nightly Airbnb pr
 
     . Numeric and categorical features, including amenities counts and property  characteristics.
     . Target encoding of neighbourhood_cleansed to capture local price patterns.
-    . Computes derived features like dist_to_center_km and avg_comment_length.
 
 . Modeling
 
     . XGBoost Regressor trained on log-transformed nightly price (log1p(price)).
     . Handles missing values via median (numeric) and most-frequent (categorical) imputers.
     . Categorical variables are one-hot encoded.
-    . Early stopping is used during training for optimal performance.
-    . K-Fold cross-validation with out-of-fold target encoding for robust MAE/RMSE estimates.
 
 . Prediction and Deployment
 
@@ -37,12 +34,15 @@ This repository provides an end-to-end solution for predicting nightly Airbnb pr
 
 -Requirements-
 
-. Python 3.10+
-. PostgreSQL (for raw Airbnb data)
-. Docker & Docker Compose (optional, for environment reproducibility)
+- Python 3.10+ (use the version pinned in`requirements.txt` for reproducibility)
+- Docker & Docker Compose (recommended for local end-to-end)
+- PostgreSQL (the Makefile brings a containerized instance)
+- Recommended: `git`, `gcloud` (only if deploying to GCP)
 
-. Install Python dependencies:
-  pip install -r requirements.txt
+Install Python dependencies:
+
+```bash
+pip install -r requirements.txt
 
 -----------------------------------------------------------------------------
 
@@ -52,26 +52,83 @@ The repository uses a Makefile to streamline workflow:
 
 Command	Description:
 
+. make up
+    Start Docker Compose services (detached).
+
+. make schema
+    Ensure the DB service is running, then apply `sql/schema.sql` inside the `db` container to create the `raw` schema and tables.
+
+. make load
+    Load raw CSV data into the `raw` schema by executing `sql/load.sql` inside the `db` container.
+
+. make indexes
+    Create database indexes by executing `sql/indexes.sql` inside the `db` container.
+
 . make db
-    #################################
+    Convenience target that runs `up`, `schema`, `load`, and `indexes` in sequence to prepare the local database.
+
+. make verify
+    Run a set of `psql` checks in the `db` container to list `raw` tables, show counts for `raw.listings` and `raw.reviews`, and display table schemas.
+
+. make down
+    Stop and remove Docker Compose containers.
+
+. make reset
+    Tear down containers and volumes, bring the stack back up and re-run `schema`, `load`, and `indexes` to recreate and reload the database.
+
+. make count_rows
+    Quick SQL count that reports the number of rows in `raw.listings` and `raw.reviews`.
 
 . make clean
-    #################################
+    Run the cleaning pipeline scripts: `python scripts/clean_listings.py` and `python scripts/clean_reviews.py` to populate the `clean` schema.
 
 . make verify_clean
-    #################################
-
-. make cache
-    Generate cached parquet dataset for faster access.
+    Run a diagnostic query that reports table names, column counts, row counts, and min/max prices for `clean` tables (`listings_features`, `reviews`, `reviews_summary`).
 
 . make train
-    Train the final model using the latest processed dataset. Saves the pipeline, preprocessor, and metadata.
+    Run the legacy training script: `python scripts/model.py`.
 
-. make evaluate
-    Run K-Fold cross-validation with out-of-fold target encoding for neighbourhood, and optionally train the final model.
+. make train_monotone
+    Run the monotone-constrained training pipeline: `python scripts/model_monotone.py`.
 
- .make app
-    Launch the Streamlit web application.
+. make start_api
+    Start the FastAPI application locally with Uvicorn on port `8000` (reload enabled).
+
+. make start_streamlit
+    Start the Streamlit UI locally (points to `http://localhost:8000` by default) on port `8501`.
+
+. make local_compose
+    Start the `api` and `streamlit` services via Docker Compose (built if necessary).
+
+. make stop_all
+    Stop and remove the `api` and `streamlit` compose services (leaves `db` if desired).
+
+. make up_all
+    Build and bring up the full stack (`db`, `api`, `streamlit`) via Docker Compose.
+
+. make test_api_health
+    Curl the `/health` endpoint of the running API for a quick smoke test.
+
+. make test_api_metadata
+    Curl the `/metadata` endpoint of the running API.
+
+. make test_api_predict
+    POST an inline single-row JSON sample to `/predict` and pretty-print the response (useful for basic functional testing).
+
+. make test_api_predict_file
+    POST a JSON file (set via `JSON=path/to/file.json`) to `/predict` for integration testing of batched inputs.
+
+. make build_streamlit_image
+    Build the Streamlit Docker image locally using `Dockerfile.streamlit`.
+
+. make build_api_image
+    Wrapper target to build the API Docker image (delegates to the project’s docker build workflow).
+
+. make deploy_api
+    Composite target that orchestrates the API build → push → deploy workflow (wraps `docker_allow`, `docker_build`, `docker_push`, `docker_deploy` where configured).
+
+. make deploy_all
+    High-level target that runs `deploy_api` (add Streamlit deployment steps if you choose to host Streamlit in the cloud).
 
 -----------------------------------------------------------------------------
 
@@ -79,63 +136,57 @@ Command	Description:
 ```text
 airbnb-paris-prices/
 │
+├─ .devcontainer/
+│   └─ devcontainer.json
+│
+├─ .streamlit/
+│   ├─ config.toml
+│   └─ secrets.toml
+│
 ├─ app/
-│   └─ streamlit_app.py                 # Streamlit web application entrypoint
+│   ├─ app.py
+│   ├─ config.py
+│   ├─ paris_bnb_map.py
+│   └─ streamlit_app.py
 │
 ├─ data/
-│   ├─ raw/                             # Raw unprocessed Airbnb data
-│   └─ processed/                       # Processed & cached dataset (parquet)
+│   └─ raw/
 │
 ├─ docs/
-│   ├─ feature_dictionary.md            # Description of features
-│   ├─ model_card.md                    # Model summary and details
-│   ├─ model_metrics.csv                # MAE/RMSE and other metrics
-│   └─ top_features.csv                 # Feature importance or rankings
+│   ├─ feature_dictionary.md
+│   └─ property_type_map.json
 │
 ├─ models/
-│   ├─ metadata.json                    # Metadata for model and preprocessing
-│   ├─ neighbourhood_te.json            # Full-data target encoding mapping
-│   ├─ preprocessing_v1.pkl             # Preprocessor pipeline
-│   └─ xgb_model_v1.pkl                 # Trained XGBoost model pipeline
+│   ├─ model_monotone.joblib
+│   └─ model_monotone.json
+│
+├─ notebooks/
 │
 ├─ scripts/
-│   ├─ clean_listings.py                # Scripts for cleaning Airbnb listings
-│   └─ clean_reviews.py                 # Scripts for cleaning review summaries
+│   ├─ clean_listings.py
+│   ├─ clean_reviews.py
+│   ├─ model_monotone.py
+│   └─ predict.py
 │
 ├─ sql/
-│   ├─ indexes.sql                      # Database index creation
-│   ├─ load.sql                         # Loading raw data into database
-│   └─ schema.sql                       # Database schema definition
+│   ├─ indexes.sql
+│   ├─ load.sql
+│   └─ schema.sql
 │
-├─ src/
-│   ├─ __pycache__/                     # Compiled Python bytecode
-│   │   ├─ __init__.cpython-310.pyc
-│   │   └─ config.cpython-310.pyc
-│   │
-│   ├─ __init__.py
-│   ├─ config.py                        # Global paths and constants
-│   │
-│   ├─ data/
-│   │   ├─ __pycache__/
-│   │   ├─ __init__.py
-│   │   └─ load_data.py                 # Load and cache processed data
-│   │
-│   ├─ features/
-│   │   ├─ __pycache__/
-│   │   └─ build_features.py            # Feature engineering functions
-│   │
-│   └─ models/
-│       ├─ __pycache__/
-│       ├─ __init__.py
-│       ├─ evaluate.py                  # K-Fold CV + target encoding
-│       ├─ predict.py                   # Prediction helper module
-│       └─ train.py                     # Final training script
-│
+├─ .envrc
+├─ .env
+├─ .env.yaml
+├─ .gcloudignore
 ├─ .gitignore
+├─ cloudbuild.yaml
 ├─ docker-compose.yml
+├─ Dockerfile.api
+├─ Dockerfile.streamlit
 ├─ Makefile
 ├─ README.md
-└─ requirements.txt
+├─ requirements.txt
+└─ setup.py
+
 ```
 
 -----------------------------------------------------------------------------
@@ -147,49 +198,40 @@ airbnb-paris-prices/
     make db
     make clean
 
-.2  Generate Cached Dataset
+.2  Train the Model
 
-    make cache
+    make train_monotone
 
-.3  Train the Model
+      (Monotone-constrained training.
+      Generate model_monotone.joblib and
+      model monotone.json)
 
-    make train
+.3  Start services for local testing
 
-      (This will train XGBoost on log-transformed nightly price.
-       Saves pipeline to models/xgb_model_v1.pkl and metadata to
-       models/metadata.json.)
+    make run_api
 
-.4  Evaluate Model Performance
+      (Start FastAPI locally (development server))
 
-    make evaluate
 
-      (Runs 5-fold cross-validation using out-of-fold target encoding.
-       Produces stable MAE and RMSE estimates.
-       Optionally retrains final model on full dataset.)
+.4  Run Streamlit App
 
-.5  Run Streamlit App
-
-    make app
+    make run_streamlit
 
       (Interactive interface for predicting nightly price.
       Input fields for neighbourhood, property_type, room_type,
-      accommodates, bedrooms, beds, bathrooms, avg_comment_length, days_since_last_review. Predicted price displayed instantly.)
+      accommodates, bedrooms, beds and bathrooms.
+      Predicted price displayed instantly.)
 
 -----------------------------------------------------------------------------
 
--Notes-
 
-. Target Encoding: neighbourhood_cleansed is encoded using mean price.
-  During prediction, unseen or missing neighbourhoods default to the global mean.
+## Highlights
 
-. Log Transformation: price is trained with log1p(price) to stabilize
-  variance; predictions are inverted using expm1.
-
-. Caching: Both Streamlit and training scripts leverage caching to avoid
-  recomputation and improve responsiveness.
-
-. Validation Metrics: MAE and RMSE are reported on a validation split for
-  train.py and across folds for evaluate.py.
+- Clean & reproducible data pipeline that ingests raw Airbnb CSVs into a local PostgreSQL instance.
+- Feature engineering: numeric/categorical processing, amenities features, derived ratios.
+- Modeling: XGBoost regressor trained on log-transformed nightly price with a reproducible pipeline and metadata.
+- Web app: Streamlit UI for interactive predictions.
+- Docker + Docker Compose for local reproducible environments, plus `cloudbuild.yaml` for GCP Cloud Run deployments.
 
 -----------------------------------------------------------------------------
 
