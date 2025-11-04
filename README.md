@@ -41,7 +41,7 @@ This repository provides an end-to-end solution for predicting nightly Airbnb pr
 
 Install Python dependencies:
 
-```bash
+
 pip install -r requirements.txt
 
 -----------------------------------------------------------------------------
@@ -51,7 +51,7 @@ pip install -r requirements.txt
 The repository uses a Makefile to streamline workflow:
 
 Command	Description:
-
+```bash
 . make up
     Start Docker Compose services (detached).
 
