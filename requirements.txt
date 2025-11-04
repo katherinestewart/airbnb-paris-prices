@@ -1,11 +1,37 @@
+# Core database & ORM
 sqlalchemy
 psycopg2-binary
+
+# Data manipulation & numerical computing
 pandas
 numpy
+
+# Machine learning & model persistence
 scikit-learn
 xgboost
 joblib
+
+# Visualization
 matplotlib
 seaborn
+
+# App / UI
 streamlit
+
+# Binary formats / high-performance I/O
 pyarrow
+
+# Web backend (FastAPI + Uvicorn)
+fastapi
+uvicorn[standard]
+
+# For local .env and configuration handling
+python-dotenv
+pydantic
+
+# For GCP deployment utilities
+google-cloud-storage
+google-cloud-secret-manager
+
+# For Streamlit secrets and JSON operations
+requests

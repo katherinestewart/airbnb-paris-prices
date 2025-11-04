@@ -1,0 +1,59 @@
+steps:
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        echo "Configuring docker for Artifact Registry..."
+        gcloud auth configure-docker ${_REGION}-docker.pkg.dev --quiet
+
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'build',
+        '-t',
+        '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${IMAGE_NAME}:$SHORT_SHA',
+        '-f',
+        'Dockerfile.api',
+        '.'
+      ]
+
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      [
+        'push',
+        '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${IMAGE_NAME}:$SHORT_SHA'
+      ]
+
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${IMAGE_NAME}:$SHORT_SHA"
+        echo "Deploying ${IMAGE} to Cloud Run service: ${_SERVICE_NAME} (region: ${_REGION})"
+        gcloud run deploy "${_SERVICE_NAME}" \
+          --image "${IMAGE}" \
+          --region "${_REGION}" \
+          --platform managed \
+          --allow-unauthenticated \
+          --memory "${_MEMORY}" \
+          --set-env-vars "PORT=8080,ARTIFACTS_DIR=/app/models,MODEL_FILE=/app/models/model_monotone.joblib,META_FILE=/app/models/model_monotone.json"
+
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${IMAGE_NAME}:$SHORT_SHA'
+
+substitutions:
+  _SERVICE_NAME: "airbnb-predict-api"
+  _REGION: "europe-west1"
+  _MEMORY: "2Gi"
+  _REPO: "airbnb-paris-repo"
+  IMAGE_NAME: "airbnb-predict-api"
+
+timeout: "1200s"

@@ -1,0 +1,56 @@
+# .gcloudignore
+# Files and folders to ignore when uploading to Google Cloud Build / gcloud
+
+# Git, editor, OS
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Python cache and build files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+pip-wheel-metadata/
+
+# Environment and local configs
+.env
+.env.*
+.envrc
+
+# Streamlit secrets and local configuration
+.streamlit/secrets.toml
+.streamlit/.secrets.toml
+
+# Raw data and local-only files
+data/
+notebooks/
+*.db
+*.sqlite3
+airbnb.db
+
+# Credentials & keys
+credentials.json
+service-account.json
+*.pem
+*.key
+
+# Devcontainer / Docker context
+.devcontainer/
+Dockerfile.api.local
+docker-compose.yml
+
+# Test, coverage, misc
+.pytest_cache/
+htmlcov/
+coverage/
+.tox/
+*.log

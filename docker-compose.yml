@@ -11,6 +11,50 @@ services:
     volumes:
     - airbnb_paris_data:/var/lib/postgresql/data
     - ./:/work
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: airbnb_api
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      - AIRBNB_DB_URL=postgresql://airbnb:airbnb@db:5432/airbnb
+      - ARTIFACTS_DIR=/app/models
+      - MODEL_FILE=/app/${MODEL_FILE}
+      - META_FILE=/app/${META_FILE}
+      - PORT=8080
+    volumes:
+      - ./models:/app/models:ro
+      - ./:/work:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: airbnb_streamlit
+    depends_on:
+      - api
+    env_file:
+      - .env
+    environment:
+      - PREDICT_API_URL=http://api:8080
+      - ARTIFACTS_DIR=/app/models
+      - MODEL_FILE=/app/${MODEL_FILE}
+      - META_FILE=/app/${META_FILE}
+      - PORT=8501
+    volumes:
+      - ./models:/app/models:ro
+      - ./:/work:ro
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+
 
 volumes:
   airbnb_paris_data:
