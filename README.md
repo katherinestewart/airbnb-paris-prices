@@ -129,7 +129,7 @@ Command	Description:
 
 . make deploy_all
     High-level target that runs `deploy_api` (add Streamlit deployment steps if you choose to host Streamlit in the cloud).
-
+```
 -----------------------------------------------------------------------------
 
 -Directory Structure-
@@ -186,7 +186,6 @@ airbnb-paris-prices/
 ├─ README.md
 ├─ requirements.txt
 └─ setup.py
-
 ```
 
 -----------------------------------------------------------------------------
